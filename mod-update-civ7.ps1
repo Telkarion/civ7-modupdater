@@ -1,6 +1,7 @@
 ﻿$destinationDirectory = "$env:LOCALAPPDATA\Firaxis Games\Sid Meier's Civilization VII\Mods"
 #$destinationDirectory = "$env:HOMEDRIVE$env:HOMEPATH\test"
 $logFile = Join-Path -Path $destinationDirectory -ChildPath "mod-update-civ7.log"
+$urlsFileUrl = "https://raw.githubusercontent.com/Telkarion/civ7-modupdater/refs/heads/main/modsurls"
 
 # Fonction pour écrire des logs avec un timestamp
 function log {
@@ -55,22 +56,33 @@ if (-not (Get-Module -ListAvailable -Name 7Zip4PowerShell)) {
 
 }
 
-
-# Liste des URLs des fichiers ZIP à télécharger
-$zipUrls = @(
-    "https://forums.civfanatics.com/resources/tcs-improved-plot-tooltip.31859",
-    "https://forums.civfanatics.com/resources/sukritacts-simple-ui-adjustments.31860",
-    "https://forums.civfanatics.com/resources/ynamp-larger-map-tsl-continents-beta.31855",
-    "https://forums.civfanatics.com/resources/trade-lens.31886",
-    "https://forums.civfanatics.com/resources/artificially-intelligent-ai-mod.31881",
-    "https://forums.civfanatics.com/resources/detailed-tech-civic-progress.31924"
-)
-
 # Purger le répertoire de destination
 if (Test-Path $destinationDirectory) {
     Remove-Item $destinationDirectory\* -Recurse -Force
 } else {
     New-Item -ItemType Directory -Path $destinationDirectory
+}
+
+# Liste des URLs des fichiers ZIP à télécharger
+$defaultZipUrls = @(
+    "https://forums.civfanatics.com/resources/tcs-improved-plot-tooltip.31859",
+    "https://forums.civfanatics.com/resources/sukritacts-simple-ui-adjustments.31860",
+    "https://forums.civfanatics.com/resources/ynamp-larger-map-tsl-continents-beta.31855",
+    "https://forums.civfanatics.com/resources/trade-lens.31886",
+    "https://forums.civfanatics.com/resources/artificially-intelligent-ai-mod.31881",
+    "https://forums.civfanatics.com/resources/detailed-tech-civic-progress.31924",
+    "https://forums.civfanatics.com/resources/leonardfactorys-policy-yield-previews.32012/"
+)
+
+# Télécharger et lire les URLs à partir du fichier texte distant
+try {
+    $urlsFilePath = Join-Path -Path $destinationDirectory -ChildPath "urls.txt"
+    Invoke-WebRequest -Uri $urlsFileUrl -OutFile $urlsFilePath
+    $zipUrls = Get-Content -Path $urlsFilePath
+    log "Liste des URLs récupérée avec succès."
+} catch {
+    log "Erreur lors de la récupération de la liste des URLs. Utilisation de la liste par défaut en repli."
+    $zipUrls = $defaultZipUrls
 }
 
 # Télécharger et décompresser chaque fichier ZIP
