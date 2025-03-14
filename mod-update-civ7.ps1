@@ -51,9 +51,15 @@ else {
 
 if (-not (Get-Module -ListAvailable -Name 7Zip4PowerShell)) {
 
-    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-        # Relancer le script avec des privilèges élevés
-        Start-Process powershell "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator"))
+    {
+        $command = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+        if ($Local) {
+            $command += " -Local"
+        }
+        $command += " -WorkingDirectory `"$WorkingDirectory`""
+
+        Start-Process powershell -ArgumentList $command -Verb RunAs
         exit
     }
 
