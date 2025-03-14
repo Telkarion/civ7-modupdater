@@ -49,7 +49,18 @@ else {
 }
 
 
-if (-not (Get-Module -ListAvailable -Name 7Zip4PowerShell)) {
+# Liste des modules requis
+$requiredModules = @("7Zip4PowerShell")
+
+# Vérifier les modules manquants
+$missingModules = @()
+foreach ($module in $requiredModules) {
+    if (-not (Get-Module -ListAvailable -Name $module)) {
+        $missingModules += $module
+    }
+}
+
+if ($missingModules.Count -gt 0) {
 
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator"))
     {
@@ -63,15 +74,36 @@ if (-not (Get-Module -ListAvailable -Name 7Zip4PowerShell)) {
         exit
     }
 
-    #   Install 7zip module
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-    Set-PSRepository -Name 'PSGallery' -SourceLocation "https://www.powershellgallery.com/api/v2" -InstallationPolicy Trusted
-    Install-Module -Name 7Zip4PowerShell -Force
+    # Vérifier et forcer l'utilisation de TLS 1.2 uniquement si nécessaire
+    if ([Net.ServicePointManager]::SecurityProtocol -notmatch "Tls12") {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    }
 
-    # Vérifier l'installation du module
-    if (-not (Get-Module -ListAvailable -Name 7Zip4PowerShell)) {
-        log "Le module 7Zip4PowerShell n'est pas installé correctement."
+    # Vérifier si NuGet est déjà installé avant d'essayer de l'installer
+    if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+    }
+    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+    if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+        Register-PSRepository -Default
+    }
+    Set-PSRepository -Name 'PSGallery' -SourceLocation "https://www.powershellgallery.com/api/v2" -InstallationPolicy Trusted
+
+    foreach ($module in $missingModules) {
+        Install-Module -Name $module -Force -Scope CurrentUser
+    }
+
+    # Vérifier que l'installation a réussi
+    $stillMissing = @()
+    foreach ($module in $missingModules) {
+        if (-not (Get-Module -ListAvailable -Name $module)) {
+            $stillMissing += $module
+        }
+    }
+
+    if ($stillMissing.Count -gt 0) {
+        log "Les modules suivants n'ont pas pu être installés : $($stillMissing -join ', ')"
+        Read-Host "press key"
         exit
     }
 
@@ -146,7 +178,7 @@ foreach ($url in $zipUrls)
             Expand-Archive -Path $zipFilePath -DestinationPath $destinationDirectory
         }
         { $_.EndsWith(".rar") } {
-            Write-Host "RAR not supported yet"
+            Expand-7Zip -ArchiveFileName $zipFilePath -TargetPath $destinationDirectory
         }
         Default {
             log "Aucun décompresseur disponible pour le fichier $_"
